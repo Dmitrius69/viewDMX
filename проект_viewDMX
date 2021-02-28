@@ -1,0 +1,12 @@
+Виды модификаторов для вывода целых чисел в printf
+%d--> for int
+
+%u--> for unsigned int
+
+%ld--> for long int or long
+
+%lu--> for unsigned long int or long unsigned int or unsigned long
+
+%lld--> for long long int or long long
+
+%llu--> for unsigned long long int or unsigned long long

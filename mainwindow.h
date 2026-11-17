@@ -2,10 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QTime>
+#include <QGraphicsRectItem>
 #include <QTimer>
+
+#include <array>
 
 namespace Ui {
 class MainWindow;
@@ -16,41 +17,27 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = 0);
-    ~MainWindow();
-    int Cnt[50];
-    int gX = 0;
-    struct mPoint { int gX1 ;
-              int gY1 ;
-              int gW1 ;
-              int gH1 ;
-            }  ;
-    mPoint myPoints[50];
-    const int widthBar = 80;
-    const int deltaBar = 83;
-
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
 
 private slots:
-
-
     void on_pushButton_pressed();
-
     void on_pushButton_2_pressed();
-
     void slotTimerAlarm();
 
 private:
+    static constexpr int channelCount = 8;
+
     Ui::MainWindow *ui;
     QTimer *timer;
     bool tstart;
-    QGraphicsScene      *scene;     // Объявляем сцену для отрисовки
+    QGraphicsScene *scene;
+    std::array<int, channelCount> channelValues;
+    std::array<QGraphicsRectItem *, channelCount> bars;
 
-    void drawBars(int idx, int bHeight);
-    void getRandData();
-    void drawGraph(int Data[]);
-
+    void initializeBars();
+    void getRandomData();
+    void drawGraph();
 };
 
 #endif // MAINWINDOW_H
-
-

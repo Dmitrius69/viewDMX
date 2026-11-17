@@ -1,16 +1,27 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <Qt>
-#include <QTextEdit>
-#include <QTime>
 
-//#include <QtGui/QtTextEdit.h>
+#include <QBrush>
+#include <QPen>
+#include <QResizeEvent>
 
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+#include <random>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+    , timer(new QTimer(this))
+    , tstart(false)
+    , scene(new QGraphicsScene(this))
 {
     ui->setupUi(this);
+
+    for (int i = 0; i < channelCount; ++i) {
+        ui->gridLayout->itemAtPosition(0, i)->widget()->setProperty("dmxChannel", i + 1);
+        channelValues[i] = 0;
+        bars[i] = nullptr;
+    }
+
     ui->label->setText("1");
     ui->label_2->setText("2");
     ui->label_3->setText("3");
@@ -19,143 +30,102 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->label_6->setText("6");
     ui->label_7->setText("7");
     ui->label_8->setText("8");
-    
 
-    for (int i=0; i<50; i++) Cnt[i]=0;
-    QTime midnight(0,0,0); //создаем счетчик времени
-    qsrand(midnight.secsTo(QTime::currentTime())); //инициализируем нас счетчик случайных чисел
-    timer = new QTimer();
-    connect(timer, SIGNAL(timeout()),this,SLOT(slotTimerAlarm()));
-    tstart = false;
-    scene = new QGraphicsScene();
     ui->graphicsView->setScene(scene);
+    ui->graphicsView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->graphicsView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    initializeBars();
 
+    timer->setInterval(300);
+    connect(timer, &QTimer::timeout, this, &MainWindow::slotTimerAlarm);
 }
 
 MainWindow::~MainWindow()
 {
+    timer->stop();
     delete ui;
 }
 
+void MainWindow::initializeBars()
+{
+    scene->setBackgroundBrush(QBrush(Qt::blue));
 
+    for (int i = 0; i < channelCount; ++i) {
+        bars[i] = scene->addRect(0, 0, 1, 1,
+                                 QPen(Qt::darkGreen),
+                                 QBrush(Qt::green));
+    }
 
+    drawGraph();
+}
 
 void MainWindow::on_pushButton_pressed()
 {
-    if (!tstart)
-       { timer->start(300); tstart = true; }
-    else
-       { timer->stop(); tstart = false; }
+    tstart = !tstart;
 
+    if (tstart)
+        timer->start();
+    else
+        timer->stop();
 }
 
 void MainWindow::on_pushButton_2_pressed()
 {
-    quick_exit(0);
+    close();
 }
 
-void MainWindow::drawBars(int idx, int bHeight)
+void MainWindow::getRandomData()
 {
+    static std::random_device randomDevice;
+    static std::mt19937 generator(randomDevice());
+    std::uniform_int_distribution<int> distribution(0, 255);
 
+    for (int i = 0; i < channelCount; ++i)
+        channelValues[i] = distribution(generator);
+}
 
-    int x,y;
-    int gW, gH;
+void MainWindow::drawGraph()
+{
+    const QRectF viewRect = ui->graphicsView->rect();
+    const double width = viewRect.width();
+    const double height = viewRect.height();
 
-    gW = ui->graphicsView->width();
-    gH = ui->graphicsView->height();
+    if (width <= 0.0 || height <= 0.0)
+        return;
 
-    QString sDeb = QString::number(gW);
-    ui->debug1->setText( sDeb);
-    sDeb = QString::number(gH);
-    ui->debug2->setText( sDeb);
+    const double padding = 10.0;
+    const double plotWidth = width - 2.0 * padding;
+    const double plotHeight = height - 2.0 * padding;
+    const double slotWidth = plotWidth / channelCount;
+    const double barWidth = slotWidth * 0.70;
 
+    scene->setSceneRect(0.0, 0.0, width, height);
 
-    int x0 = 0; //будем смещать x c помощью глобальной переменной
-    int y0 = 300; //высота наших графиков будет (graphicsView->height ) pix
+    ui->debug1->setText(QString::number(static_cast<int>(width)));
+    ui->debug2->setText(QString::number(static_cast<int>(height)));
 
+    for (int i = 0; i < channelCount; ++i) {
+        const double barHeight = plotHeight * channelValues[i] / 255.0;
+        const double x = padding + i * slotWidth + (slotWidth - barWidth) / 2.0;
+        const double y = padding + plotHeight - barHeight;
 
-    QRectF rF(0, 0, gW, gH);
-    scene->setSceneRect(0, 0, gW, gH); //устанавливаем размер нашей сцены, он должен совпадать с размером graphicsView
-    QPolygon backP(QRect(0,0,gW,gH), false) ;
-
-    QPen mPen(Qt::green);
-    QBrush mBrush(Qt::green);
-    QPen wPen(Qt::blue);
-    QBrush wBrush(Qt::blue);
-
-    //scene->addPolygon(*backP, mPen, mBrush);
-
-    x = x0+idx*deltaBar;
-    y = y0 - bHeight;
-    QBrush *blueBrush = new QBrush(Qt::blue);
-    scene->setBackgroundBrush(*blueBrush);
-
-    if (gX == 0)
-    {
-        myPoints[idx].gX1= x; myPoints[idx].gY1 = y; myPoints[idx].gW1 = 10; myPoints[idx].gH1 = bHeight;
-
+        bars[i]->setRect(x, y, barWidth, barHeight);
     }
-    else
-    {
-        QPolygon bar(QRect(myPoints[idx].gX1,myPoints[idx].gY1,myPoints[idx].gW1,myPoints[idx].gH1), false);
-        scene->addPolygon(bar, wPen, wBrush);
-
-    }
-
-    //scene->addLine(x, y, x+10, y, mPen);
-    //scene->addLine(x+10, y, x+10, y+bHeight, mPen);
-    //scene->addLine(x+10, y+bHeight, x, y + bHeight, mPen );
-    //scene->addLine(x, y+ bHeight, x, y, mPen);
-    myPoints[idx].gX1= x; myPoints[idx].gY1 = y; myPoints[idx].gW1 = widthBar; myPoints[idx].gH1 = bHeight;
-    QPolygon bar(QRect(x,y,widthBar,bHeight), false);
-    scene->addPolygon(bar, mPen, mBrush);
-    if (idx == 7) gX = 1; //первый запуск прошел
-
-
-}
-
-
-void MainWindow::drawGraph(int Data[])
-{
-
-    for (int i=0;i<8;i++) drawBars(i, Data[i]);
-}
-
-void MainWindow::getRandData()
-{
-   Cnt[0]  = qrand()%255;
-   Cnt[1]  = qrand()%255;
-   Cnt[2]  = qrand()%255;
-   Cnt[3]  = qrand()%255;
-   Cnt[4]  = qrand()%255;
-   Cnt[5]  = qrand()%255;
-   Cnt[6]  = qrand()%255;
-   Cnt[7]  = qrand()%255;
-   Cnt[8]  = qrand()%255; //лишний! можно не учитываить
-
 }
 
 void MainWindow::slotTimerAlarm()
 {
+    getRandomData();
 
-    getRandData();
-    ui->lcdNumber->display(Cnt[0]);
+    ui->lcdNumber->display(channelValues[0]);
+    ui->lcdNumber_2->display(channelValues[1]);
+    ui->lcdNumber_3->display(channelValues[2]);
+    ui->lcdNumber_4->display(channelValues[3]);
+    ui->lcdNumber_5->display(channelValues[4]);
+    ui->lcdNumber_6->display(channelValues[5]);
+    ui->lcdNumber_7->display(channelValues[6]);
+    ui->lcdNumber_8->display(channelValues[7]);
 
-
-    ui->lcdNumber_2->display(Cnt[1]);
-
-    ui->lcdNumber_3->display(Cnt[2]);
-
-    ui->lcdNumber_4->display(Cnt[3]);
-
-    ui->lcdNumber_5->display(Cnt[4]);
-
-    ui->lcdNumber_6->display(Cnt[5]);
-
-    ui->lcdNumber_7->display(Cnt[6]);
-
-    ui->lcdNumber_8->display(Cnt[7]);
-    drawGraph(Cnt);
-
+    drawGraph();
 }
